@@ -5,7 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import ApplicationForm from '../components/ApplicationForm';
 
-const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
+const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com','aqibhanif47@gmail.com'];
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);

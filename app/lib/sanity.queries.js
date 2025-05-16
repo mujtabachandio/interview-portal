@@ -244,4 +244,42 @@ export async function hasExistingApplication(userId) {
     { userId }
   );
   return !!application;
+}
+
+export async function deleteStatusUpdate(applicationId, statusIndex) {
+  try {
+    // First get the current application to verify the status history exists
+    const currentApplication = await client.fetch(
+      `*[_type == "application" && _id == $applicationId][0]`,
+      { applicationId }
+    );
+
+    if (!currentApplication || !currentApplication.statusHistory) {
+      throw new Error('Application or status history not found');
+    }
+
+    // Create a new status history array without the deleted entry
+    const updatedStatusHistory = currentApplication.statusHistory.filter((_, index) => index !== statusIndex);
+
+    // If this was the last status update, we need to update the current status
+    let currentStatus = currentApplication.status;
+    if (statusIndex === currentApplication.statusHistory.length - 1 && updatedStatusHistory.length > 0) {
+      // Set the current status to the most recent status in the history
+      currentStatus = updatedStatusHistory[updatedStatusHistory.length - 1].status;
+    }
+
+    // Update the application with the new status history
+    const updatedApplication = await client
+      .patch(applicationId)
+      .set({
+        statusHistory: updatedStatusHistory,
+        status: currentStatus
+      })
+      .commit();
+
+    return updatedApplication;
+  } catch (error) {
+    console.error('Error in deleteStatusUpdate:', error);
+    throw error;
+  }
 } 

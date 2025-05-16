@@ -3,20 +3,30 @@ import { useState, useEffect } from 'react';
 import { auth } from '../../../firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter, useParams } from 'next/navigation';
-import { getApplicationById, updateApplicationStatus } from '../../../lib/sanity.queries';
+import { getApplicationById, updateApplicationStatus, deleteStatusUpdate } from '../../../lib/sanity.queries';
+import { useAuth } from '../../../contexts/AuthContext';
 
-const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
+const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com','aqibhanif47@gmail.com'];
+
+const STATUS_OPTIONS = [
+  { value: 'submitted', label: 'Submitted', color: 'blue' },
+  { value: 'review', label: 'Review', color: 'yellow' },
+  { value: 'rejected', label: 'Rejected', color: 'red' },
+  { value: 'hold', label: 'Hold', color: 'purple' },
+  { value: 'accepted', label: 'Accepted', color: 'green' }
+];
 
 export default function ApplicationDetails({ params }) {
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [reviewerNotes, setReviewerNotes] = useState('');
-  const [customStatus, setCustomStatus] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [deletingStatus, setDeletingStatus] = useState(null);
   const router = useRouter();
   const { id } = useParams();
+  const { user } = useAuth();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -29,8 +39,8 @@ export default function ApplicationDetails({ params }) {
         const applicationData = await getApplicationById(id);
         console.log('Fetched application data:', applicationData); // Debug log
         setApplication(applicationData);
+        setSelectedStatus(applicationData.status || '');
         setReviewerNotes(applicationData.reviewerNotes || '');
-        setCustomStatus(applicationData.status || '');
       } catch (err) {
         setError('Failed to fetch application details');
         console.error(err);
@@ -43,23 +53,36 @@ export default function ApplicationDetails({ params }) {
   }, [router, id]);
 
   const handleStatusUpdate = async () => {
-    if (!customStatus.trim()) {
-      return;
-    }
+    if (!selectedStatus) return;
 
     try {
-      setIsSaving(true);
-      await updateApplicationStatus(application._id, customStatus, reviewerNotes);
-      const updatedApplication = await getApplicationById(id);
-      console.log('Updated application data:', updatedApplication); // Debug log
+      setUpdating(true);
+      const updatedApplication = await updateApplicationStatus(
+        application._id,
+        selectedStatus,
+        reviewerNotes
+      );
+      console.log('Updated application:', updatedApplication);
       setApplication(updatedApplication);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setReviewerNotes('');
     } catch (err) {
-      console.error('Failed to update status:', err);
-      setError('Failed to update status. Please try again.');
+      console.error('Error updating status:', err);
+      setError('Failed to update application status');
     } finally {
-      setIsSaving(false);
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteStatus = async (statusIndex) => {
+    try {
+      setDeletingStatus(statusIndex);
+      const updatedApplication = await deleteStatusUpdate(application._id, statusIndex);
+      setApplication(updatedApplication);
+    } catch (err) {
+      console.error('Error deleting status:', err);
+      setError('Failed to delete status update');
+    } finally {
+      setDeletingStatus(null);
     }
   };
 
@@ -196,14 +219,19 @@ export default function ApplicationDetails({ params }) {
                   <label htmlFor="status" className="block text-sm font-medium text-gray-700">
                     Application Status
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="status"
-                    value={customStatus}
-                    onChange={(e) => setCustomStatus(e.target.value)}
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="Enter custom status..."
-                  />
+                  >
+                    <option value="">Select a status</option>
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div>
@@ -226,29 +254,21 @@ export default function ApplicationDetails({ params }) {
                   <button
                     type="button"
                     onClick={handleStatusUpdate}
-                    disabled={isSaving || !customStatus.trim()}
+                    disabled={!selectedStatus || updating}
                     className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                      isSaving || !customStatus.trim() ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
+                      (!selectedStatus || updating) ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
                     } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
                   >
-                    {isSaving ? (
+                    {updating ? (
                       <>
                         <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Saving...
+                        Updating...
                       </>
-                    ) : 'Save Changes'}
+                    ) : 'Update Status'}
                   </button>
-                  {saveSuccess && (
-                    <span className="text-green-600 text-sm">
-                      <svg className="inline-block h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Saved
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -288,8 +308,8 @@ export default function ApplicationDetails({ params }) {
                                     )}
                                   </p>
                                 </div>
-                                <div className="text-right text-sm whitespace-nowrap text-gray-500">
-                                  <time dateTime={entry.timestamp}>
+                                <div className="flex items-center space-x-4">
+                                  <time className="text-right text-sm whitespace-nowrap text-gray-500" dateTime={entry.timestamp}>
                                     {new Date(entry.timestamp).toLocaleDateString('en-US', {
                                       month: 'short',
                                       day: 'numeric',
@@ -297,6 +317,20 @@ export default function ApplicationDetails({ params }) {
                                       minute: 'numeric'
                                     })}
                                   </time>
+                                  <button
+                                    onClick={() => handleDeleteStatus(index)}
+                                    disabled={deletingStatus === index}
+                                    className="text-gray-400 hover:text-red-500 transition-colors duration-200"
+                                    title="Delete status update"
+                                  >
+                                    {deletingStatus === index ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                                    ) : (
+                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    )}
+                                  </button>
                                 </div>
                               </div>
                             </div>

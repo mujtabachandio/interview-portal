@@ -4,9 +4,9 @@ import { auth } from '../firebase/config';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
-const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
-
+const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com', 'aqibhanif47@gmail.com'];
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
   const [user, setUser] = useState(null);
@@ -79,9 +79,18 @@ export default function Sidebar() {
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-            <h2 className="text-xl font-semibold text-blue-700">
-              Interview Portal
-            </h2>
+            <div className="flex flex-col items-center">
+              <Image
+                src="/logo.webp"
+                alt="Logo"
+                width={100}
+                height={100}
+                className="rounded-lg"
+              />
+              <h2 className="text-xl font-semibold text-blue-700 mt-2">
+                Interview Portal
+              </h2>
+            </div>
             <button
               onClick={() => setIsOpen(false)}
               className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition"

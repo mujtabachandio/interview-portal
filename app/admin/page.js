@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getUserByFirebaseUid, getAllApplications, updateApplicationStatus } from '../lib/sanity.queries';
 import { useAuth } from '../contexts/AuthContext';
 
-const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
+const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com', 'aqibhanif47@gmail.com'];
 
 export default function AdminPanel() {
   const [applications, setApplications] = useState([]);
