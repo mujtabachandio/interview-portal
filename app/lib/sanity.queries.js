@@ -1,4 +1,4 @@
-import { client } from './sanity';
+import { client, uploadFile } from './sanity';
 
 export async function createUser(userData) {
   const { email, name, firebaseUid } = userData;
@@ -22,37 +22,50 @@ export async function getUserByFirebaseUid(firebaseUid) {
 export async function createApplication(applicationData) {
   const { documents, userId, ...rest } = applicationData;
   
-  // Upload files to Sanity
-  const uploadedDocuments = {};
-  for (const [key, file] of Object.entries(documents)) {
-    if (file) {
-      const asset = await client.assets.upload('file', file);
-      uploadedDocuments[key] = {
-        _type: 'file',
-        asset: {
-          _type: 'reference',
-          _ref: asset._id
+  try {
+    // Upload files to Sanity with retries
+    const uploadedDocuments = {};
+    for (const [key, file] of Object.entries(documents)) {
+      if (file) {
+        try {
+          const asset = await uploadFile(file);
+          uploadedDocuments[key] = {
+            _type: 'file',
+            asset: {
+              _type: 'reference',
+              _ref: asset._id
+            }
+          };
+        } catch (error) {
+          console.error(`Failed to upload ${key}:`, error);
+          throw new Error(`Failed to upload ${key}. Please try again.`);
         }
-      };
+      }
     }
-  }
 
-  return client.create({
-    _type: 'application',
-    ...rest,
-    documents: uploadedDocuments,
-    user: {
-      _type: 'reference',
-      _ref: userId
-    },
-    status: 'submitted',
-    submittedAt: new Date().toISOString()
-  });
+    // Create the application
+    const application = await client.create({
+      _type: 'application',
+      ...rest,
+      documents: uploadedDocuments,
+      applicant: {
+        _type: 'reference',
+        _ref: userId
+      },
+      status: 'submitted',
+      submittedAt: new Date().toISOString()
+    });
+
+    return application;
+  } catch (error) {
+    console.error('Error creating application:', error);
+    throw new Error('Failed to submit application. Please try again.');
+  }
 }
 
 export async function getApplicationByUserId(userId) {
   return client.fetch(`
-    *[_type == "application" && user._ref == $userId][0] {
+    *[_type == "application" && applicant._ref == $userId][0] {
       _id,
       status,
       submittedAt,
@@ -73,7 +86,7 @@ export async function getApplicationByUserId(userId) {
         "driverAbstract": documents.driverAbstract.asset->url,
         "instructorCertifications": documents.instructorCertifications.asset->url
       },
-      "user": user->{
+      "applicant": applicant->{
         _id,
         name,
         email
@@ -100,7 +113,7 @@ export async function getAllApplications() {
       examWillingness,
       monitoringProgress,
       documents,
-      "user": user->{
+      "applicant": applicant->{
         _id,
         name,
         email
@@ -132,7 +145,7 @@ export async function getApplicationById(applicationId) {
         "driverAbstract": documents.driverAbstract.asset->url,
         "instructorCertifications": documents.instructorCertifications.asset->url
       },
-      "user": user->{
+      "applicant": applicant->{
         _id,
         name,
         email

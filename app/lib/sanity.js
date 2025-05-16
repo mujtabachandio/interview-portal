@@ -20,12 +20,12 @@ export const client = createClient({
   projectId,
   dataset,
   apiVersion,
-  useCdn: true, // Set to false if statically generating pages, using ISR or tag-based revalidation
-  token, // Add your Sanity API token here
-  ignoreBrowserTokenWarning: true, // Ignore token warning in development
-  perspective: 'published', // Use 'published' for production, 'previewDrafts' for draft content
+  useCdn: false, // Set to false for mutations and file uploads
+  token,
+  ignoreBrowserTokenWarning: true,
+  perspective: 'published',
   stega: {
-    enabled: false, // Disable stega for better performance
+    enabled: false,
   },
 })
 
@@ -34,7 +34,7 @@ export const previewClient = createClient({
   projectId,
   dataset,
   apiVersion,
-  useCdn: false, // Always fetch fresh data
+  useCdn: false,
   token,
   perspective: 'previewDrafts',
   stega: {
@@ -44,6 +44,24 @@ export const previewClient = createClient({
 
 // Helper function to get the appropriate client
 export const getClient = (preview = false) => (preview ? previewClient : client)
+
+// Helper function to handle file uploads with retries
+export const uploadFile = async (file, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const asset = await client.assets.upload('file', file, {
+        filename: file.name,
+        contentType: file.type,
+      });
+      return asset;
+    } catch (error) {
+      console.error(`File upload attempt ${i + 1} failed:`, error);
+      if (i === retries - 1) throw error;
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
 
 const builder = imageUrlBuilder(client);
 
