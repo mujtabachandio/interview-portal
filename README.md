@@ -1,199 +1,36 @@
-firebase SDK 
-
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyD_g3Xjq2A9jFReDQ7L4AJyrW3-KH8RsFk",
-    authDomain: "interview-portal-e5ce1.firebaseapp.com",
-    projectId: "interview-portal-e5ce1",
-    storageBucket: "interview-portal-e5ce1.firebasestorage.app",
-    messagingSenderId: "1087378373159",
-    appId: "1:1087378373159:web:3954aeda7191e72cbbec02",
-    measurementId: "G-BP1P105W4H"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
-
-
-
-project doc 
-
-
-
-👥 User Journey
-1. User Registration (Sign Up)
-New users can create an account by providing a valid email address and a secure password.
-
-
-Upon successful registration, users are redirected to the Sign In page.
-
-
-2. User Login (Sign In)
-Registered users can log in using their email and password.
-
-
-After successful login, users are redirected to their Profile Dashboard.
-
-
-3. Profile Dashboard
-Users are greeted with a welcome message and a call-to-action button: “Apply Now”.
-
-
-This dashboard also stores the status of any previous applications (if applicable).
-🔐 Admin Dashboard
-1. Admin-Only Access
-The dashboard is secured and accessible only by administrators via a separate admin login.
-
-
-2. View Submissions
-Admins can view all applicant submissions.
-
-
-Each submission includes:
-
-
-User's contact information
-
-
-Responses to all interview questions
-
-
-Downloadable document files
-
-
-Submission timestamp
-
-
-3. Manage Candidates
-Admins can mark statuses such as "Reviewed", "Shortlisted", "Rejected"
-
-
-Option to export data for offline evaluation or compliance
-Applicants will be required to respond to the following 10 questions, which assess their experience, teaching mindset, regulatory knowledge, and instructional approach:
-Experience Overview:
- Can you briefly describe your experience as a truck driver, including the types of vehicles you’ve operated?
-
-
-Motivation for Teaching:
- What motivates you to become a driving instructor, and what excites you about teaching new drivers?
-
-
-Training & Mentoring Background:
- Have you ever trained or mentored others? If so, how did you support their learning and growth?
-
-
-Simplifying Complex Concepts:
- How would you explain a complex topic—like the air brake system—to someone with no prior truck experience?
-
-
-Handling Maneuver Challenges:
- What’s your approach when a student is struggling with maneuvers like alley docking or parallel parking?
-
-
-Managing Student Anxiety:
- How do you help students who become frustrated or anxious during on-the-road training?
-	
-
-Regulatory Knowledge:
- How familiar are you with DOT regulations, and how do you ensure your students understand and follow them?
-
-
-Physical Readiness:
- Are you comfortable working outdoors in all weather conditions and climbing in and out of trucks throughout the day?
-
-
-Exam Willingness:
- Are you willing to take and pass the MVC Instructor Exam if you haven’t already?
-
-
-Monitoring Student Progress:
- How do you track student progress and provide constructive feedback?
-
-
-📎 Required Document Uploads
-Applicants must upload clear and valid copies of the following documents to be considered for the next step:
-Driver’s License or CDL
- (Valid copy required)
-
-
-Medical Card
- (Current and valid medical certification)
-
-
-Driver’s Abstract
- (Recent motor vehicle report/abstract)
-
-
-Instructor Certifications or Licenses
- (If currently held – optional if not yet obtained)
-
-
-
-use samity for data uploading and data fetching? what do you say ?
-
-
-
-
-
+This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
-interview-portal
-├─ .eslintrc.json
-├─ app
-│  ├─ admin
-│  │  └─ page.tsx
-│  ├─ apply
-│  │  └─ page.tsx
-│  ├─ components
-│  │  └─ Header.tsx
-│  ├─ context
-│  │  └─ AuthContext.tsx
-│  ├─ favicon.ico
-│  ├─ firebase
-│  │  └─ config.ts
-│  ├─ fonts
-│  │  ├─ GeistMonoVF.woff
-│  │  └─ GeistVF.woff
-│  ├─ globals.css
-│  ├─ layout.tsx
-│  ├─ lib
-│  │  ├─ auth.ts
-│  │  └─ sanity.ts
-│  ├─ page.tsx
-│  ├─ signin
-│  │  └─ page.tsx
-│  ├─ signup
-│  │  └─ page.tsx
-│  └─ studio
-│     └─ [[...tool]]
-│        └─ page.tsx
-├─ next.config.mjs
-├─ package-lock.json
-├─ package.json
-├─ postcss.config.mjs
-├─ README.md
-├─ sanity
-│  ├─ env.ts
-│  ├─ lib
-│  │  ├─ client.ts
-│  │  ├─ image.ts
-│  │  └─ live.ts
-│  ├─ schemaTypes
-│  │  ├─ application.ts
-│  │  └─ index.ts
-│  └─ structure.ts
-├─ sanity.cli.ts
-├─ sanity.config.ts
-├─ tailwind.config.ts
-└─ tsconfig.json
 
-```
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
