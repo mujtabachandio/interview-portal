@@ -4,18 +4,26 @@ import { auth } from '../firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { getUserByFirebaseUid, getAllApplications, updateApplicationStatus } from '../lib/sanity.queries';
+import { useAuth } from '../contexts/AuthContext';
 
-const ADMIN_EMAIL = 'mujtabachandio384@gmail.com' || "adeelahmed12335@gmail.com"
+const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
 
 export default function AdminPanel() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    if (!loading && (!user || !ADMIN_EMAILS.includes(user.email))) {
+      router.push('/');
+    }
+  }, [user, loading, router]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user || user.email !== ADMIN_EMAIL) {
+      if (!user || !ADMIN_EMAILS.includes(user.email)) {
         router.push('/signin');
         return;
       }
@@ -23,9 +31,8 @@ export default function AdminPanel() {
       try {
         const applicationsData = await getAllApplications();
         setApplications(applicationsData);
-      } catch (err) {
-        setError('Failed to fetch applications');
-        console.error(err);
+      } catch (error) {
+        console.error('Error fetching applications:', error);
       } finally {
         setLoading(false);
       }

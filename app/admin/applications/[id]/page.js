@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react';
 import { auth } from '../../../firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { getApplicationById, updateApplicationStatus } from '../../../lib/sanity.queries';
 
-const ADMIN_EMAIL = 'mujtabachandio384@gmail.com';
+const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
 
 export default function ApplicationDetails({ params }) {
   const [application, setApplication] = useState(null);
@@ -13,16 +13,17 @@ export default function ApplicationDetails({ params }) {
   const [error, setError] = useState(null);
   const [reviewerNotes, setReviewerNotes] = useState('');
   const router = useRouter();
+  const { id } = useParams();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user || user.email !== ADMIN_EMAIL) {
+      if (!user || !ADMIN_EMAILS.includes(user.email)) {
         router.push('/signin');
         return;
       }
 
       try {
-        const applicationData = await getApplicationById(params.id);
+        const applicationData = await getApplicationById(id);
         setApplication(applicationData);
         setReviewerNotes(applicationData.reviewerNotes || '');
       } catch (err) {
@@ -34,12 +35,12 @@ export default function ApplicationDetails({ params }) {
     });
 
     return () => unsubscribe();
-  }, [params.id, router]);
+  }, [router, id]);
 
   const handleStatusUpdate = async (newStatus) => {
     try {
       await updateApplicationStatus(application._id, newStatus, reviewerNotes);
-      const updatedApplication = await getApplicationById(params.id);
+      const updatedApplication = await getApplicationById(id);
       setApplication(updatedApplication);
     } catch (err) {
       console.error('Failed to update status:', err);
