@@ -26,6 +26,36 @@ export default {
       initialValue: 'submitted'
     },
     {
+      name: 'statusHistory',
+      title: 'Status History',
+      type: 'array',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            {
+              name: 'status',
+              title: 'Status',
+              type: 'string'
+            },
+            {
+              name: 'notes',
+              title: 'Notes',
+              type: 'text',
+              rows: 3
+            },
+            {
+              name: 'timestamp',
+              title: 'Timestamp',
+              type: 'datetime',
+              initialValue: () => new Date().toISOString()
+            }
+          ]
+        }
+      ],
+      readOnly: true
+    },
+    {
       name: 'motivation',
       title: 'Motivation for Becoming an Instructor',
       type: 'text',

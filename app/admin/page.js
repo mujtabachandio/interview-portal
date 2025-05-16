@@ -31,7 +31,7 @@ export default function AdminPanel() {
 
       try {
         const applicationsData = await getAllApplications();
-        console.log('Fetched applications:', applicationsData); // Debug log
+        console.log('Fetched applications:', applicationsData);
         setApplications(applicationsData);
       } catch (error) {
         console.error('Error fetching applications:', error);
@@ -63,8 +63,9 @@ export default function AdminPanel() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-3 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-500 text-lg">Loading applications...</p>
           </div>
         </div>
       </div>
@@ -75,8 +76,13 @@ export default function AdminPanel() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
-            {error}
+          <div className="bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-lg shadow-sm">
+            <div className="flex items-center">
+              <svg className="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="font-medium">{error}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -84,24 +90,52 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Application List</h1>
-        
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Application List</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Manage and review instructor applications
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="bg-blue-50 px-4 py-2 rounded-lg">
+                <span className="text-sm font-medium text-blue-700">
+                  {applications.length} {applications.length === 1 ? 'Application' : 'Applications'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Applications Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {applications.map((application) => (
-            <div key={application._id} className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div 
+              key={application._id} 
+              className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border border-gray-100"
+            >
               {/* Application Card Header */}
               <div className="p-6 border-b border-gray-100">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {application.applicant?.email || 'Anonymous'}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {application.applicant?.name || 'No name provided'}
-                    </p>
+                  <div className="flex items-center space-x-3">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                      {application.applicant?.name?.[0]?.toUpperCase() || 'A'}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {application.applicant?.name || 'Anonymous'}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        {application.applicant?.email || 'No email provided'}
+                      </p>
+                    </div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                     application.status === 'approved' ? 'bg-green-100 text-green-800' :
@@ -112,46 +146,36 @@ export default function AdminPanel() {
                     {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
                   </span>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  Submitted on {new Date(application.submittedAt).toLocaleDateString()}
-                </p>
+                <div className="mt-4 flex items-center text-sm text-gray-500">
+                  <svg className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Submitted {new Date(application.submittedAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
               </div>
 
               {/* Application Preview */}
               <div className="p-6">
-                <p className="text-gray-600 line-clamp-3 mb-4">
-                  {application.motivation}
-                </p>
-                
-                {/* Status Update Controls */}
-                <div className="mt-4 space-y-2">
-                  <select
-                    value={application.status}
-                    onChange={(e) => handleStatusUpdate(application._id, e.target.value)}
-                    disabled={updatingStatus[application._id]}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      updatingStatus[application._id] ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <option value="submitted">Submitted</option>
-                    <option value="reviewing">Under Review</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
-                  {updatingStatus[application._id] && (
-                    <div className="text-sm text-blue-600 flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                      Updating status...
-                    </div>
-                  )}
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Motivation</h4>
+                  <p className="text-gray-600 line-clamp-3">
+                    {application.motivation}
+                  </p>
                 </div>
 
                 {/* View Details Button */}
                 <button
                   onClick={() => router.push(`/admin/applications/${application._id}`)}
-                  className="mt-4 w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-md hover:from-blue-700 hover:to-blue-800 transition"
+                  className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2"
                 >
-                  View Details
+                  <span>View Details</span>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
                 </button>
               </div>
             </div>

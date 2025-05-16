@@ -74,6 +74,8 @@ export async function createApplication(applicationData) {
       }
     }
 
+    const timestamp = new Date().toISOString();
+
     // Create the application
     const application = await client.create({
       _type: 'application',
@@ -84,7 +86,13 @@ export async function createApplication(applicationData) {
         _ref: userId
       },
       status: 'submitted',
-      submittedAt: new Date().toISOString()
+      submittedAt: timestamp,
+      statusHistory: [{
+        _type: 'object',
+        status: 'submitted',
+        notes: 'Application submitted',
+        timestamp
+      }]
     });
 
     console.log('Created application:', application);
@@ -100,6 +108,7 @@ export async function getApplicationByUserId(userId) {
     *[_type == "application" && applicant._ref == $userId][0] {
       _id,
       status,
+      statusHistory,
       submittedAt,
       reviewedAt,
       reviewerNotes,
@@ -132,6 +141,7 @@ export async function getAllApplications() {
     *[_type == "application"] | order(submittedAt desc) {
       _id,
       status,
+      statusHistory,
       submittedAt,
       reviewedAt,
       reviewerNotes,
@@ -159,6 +169,7 @@ export async function getApplicationById(applicationId) {
     *[_type == "application" && _id == $applicationId][0] {
       _id,
       status,
+      statusHistory,
       submittedAt,
       reviewedAt,
       reviewerNotes,
@@ -187,13 +198,43 @@ export async function getApplicationById(applicationId) {
 }
 
 export async function updateApplicationStatus(applicationId, status, reviewerNotes = '') {
+  const timestamp = new Date().toISOString();
+  
+  // First, get the current application to check if statusHistory exists
+  const currentApplication = await client.fetch(
+    `*[_type == "application" && _id == $applicationId][0]`,
+    { applicationId }
+  );
+
+  const statusHistoryEntry = {
+    _type: 'object',
+    status,
+    notes: reviewerNotes,
+    timestamp
+  };
+
+  // If statusHistory doesn't exist, create it with the new entry
+  if (!currentApplication.statusHistory) {
+    return client
+      .patch(applicationId)
+      .set({
+        status,
+        reviewerNotes,
+        reviewedAt: timestamp,
+        statusHistory: [statusHistoryEntry]
+      })
+      .commit();
+  }
+
+  // Otherwise, append to existing statusHistory
   return client
     .patch(applicationId)
     .set({
       status,
       reviewerNotes,
-      reviewedAt: new Date().toISOString()
+      reviewedAt: timestamp
     })
+    .insert('after', 'statusHistory[-1]', [statusHistoryEntry])
     .commit();
 }
 
