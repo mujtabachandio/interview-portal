@@ -2,7 +2,14 @@
 
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { 
+  getAuth, 
+  setPersistence, 
+  browserLocalPersistence, 
+  inMemoryPersistence,
+  onAuthStateChanged,
+  signOut
+} from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
@@ -16,26 +23,83 @@ const firebaseConfig = {
   measurementId: "G-BP1P105W4H"
 };
 
-// Initialize Firebase only on the client side
+// Initialize Firebase
 let app;
 let auth;
+let analytics;
 
-if (typeof window !== 'undefined') {
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApps()[0];
-  }
+try {
+  // Initialize Firebase app
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+  
+  // Initialize Auth
   auth = getAuth(app);
   
-  // Set persistence to LOCAL
-  setPersistence(auth, browserLocalPersistence)
-    .catch((error) => {
-      console.error("Auth persistence error:", error);
-    });
+  // Initialize Analytics only in production and on client side
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    analytics = getAnalytics(app);
+  }
 
-  // Initialize analytics
-  const analytics = getAnalytics(app);
+  // Set up persistence
+  if (typeof window !== 'undefined') {
+    const setupPersistence = async () => {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        console.log('Auth persistence set to LOCAL');
+      } catch (error) {
+        console.error("Local persistence error:", error);
+        try {
+          await setPersistence(auth, inMemoryPersistence);
+          console.log('Auth persistence set to MEMORY');
+        } catch (err) {
+          console.error('Failed to set memory persistence:', err);
+          throw err;
+        }
+      }
+    };
+
+    // Execute persistence setup
+    setupPersistence().catch(error => {
+      console.error('Failed to set up auth persistence:', error);
+    });
+  }
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+  throw error;
 }
 
-export { auth }; 
+// Auth state observer
+let authStateObserver = null;
+
+const setupAuthStateObserver = () => {
+  if (authStateObserver) return;
+
+  authStateObserver = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      console.log('Auth state: User is signed in', { 
+        email: user.email,
+        uid: user.uid 
+      });
+    } else {
+      console.log('Auth state: User is signed out');
+    }
+  });
+};
+
+// Initialize auth state observer on client side
+if (typeof window !== 'undefined') {
+  setupAuthStateObserver();
+}
+
+// Helper function to handle sign out
+const handleSignOut = async () => {
+  try {
+    await signOut(auth);
+    console.log('User signed out successfully');
+  } catch (error) {
+    console.error('Error signing out:', error);
+    throw error;
+  }
+};
+
+export { auth, handleSignOut }; 
