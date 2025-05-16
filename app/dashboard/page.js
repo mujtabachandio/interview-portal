@@ -5,6 +5,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import ApplicationForm from '../components/ApplicationForm';
 
+const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
+
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,14 @@ export default function Dashboard() {
           isAnonymous: user.isAnonymous,
           metadata: user.metadata
         });
+        
+        // Redirect admin users to admin panel
+        if (ADMIN_EMAILS.includes(user.email)) {
+          console.log('Dashboard: Admin user detected, redirecting to admin panel');
+          router.push('/admin');
+          return;
+        }
+        
         setUser(user);
       }
       setAuthChecked(true);
