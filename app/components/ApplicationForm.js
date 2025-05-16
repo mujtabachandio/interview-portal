@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { auth } from '../firebase/config';
-import { createApplication, getUserByFirebaseUid, createUser } from '../lib/sanity.queries';
+import { createApplication, getUserByFirebaseUid, createUser, hasExistingApplication } from '../lib/sanity.queries';
 import { useRouter } from 'next/navigation';
 
 export default function ApplicationForm() {
@@ -29,25 +29,62 @@ export default function ApplicationForm() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isFading, setIsFading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [userSetupError, setUserSetupError] = useState(null);
+  const [hasApplication, setHasApplication] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const setupUser = async () => {
-      const user = auth.currentUser;
-      if (user) {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          console.error('No authenticated user found');
+          setUserSetupError('Please sign in to submit an application');
+          return;
+        }
+
+        console.log('Setting up user:', { email: user.email, uid: user.uid });
+        
         // Check if user exists in Sanity
         let sanityUser = await getUserByFirebaseUid(user.uid);
+        console.log('Existing Sanity user:', sanityUser);
         
         // If user doesn't exist, create them
         if (!sanityUser) {
-          sanityUser = await createUser({
-            email: user.email,
-            name: user.displayName || user.email.split('@')[0],
-            firebaseUid: user.uid
-          });
+          console.log('Creating new Sanity user');
+          try {
+            sanityUser = await createUser({
+              email: user.email,
+              name: user.displayName || user.email.split('@')[0],
+              firebaseUid: user.uid
+            });
+            console.log('Created new Sanity user:', sanityUser);
+          } catch (error) {
+            console.error('Error creating Sanity user:', error);
+            setUserSetupError('Failed to create user account. Please try again.');
+            return;
+          }
         }
         
+        if (!sanityUser || !sanityUser._id) {
+          console.error('Invalid Sanity user data:', sanityUser);
+          setUserSetupError('Invalid user data. Please try again.');
+          return;
+        }
+
+        // Check if user already has an application
+        const existingApplication = await hasExistingApplication(sanityUser._id);
+        if (existingApplication) {
+          setHasApplication(true);
+          setUserSetupError('You have already submitted an application. Please check your application status.');
+          return;
+        }
+
         setUserId(sanityUser._id);
+        setUserSetupError(null);
+      } catch (error) {
+        console.error('Error in user setup:', error);
+        setUserSetupError('An error occurred while setting up your account. Please try again.');
       }
     };
 
@@ -134,6 +171,19 @@ export default function ApplicationForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (userSetupError) {
+      console.error('User setup error:', userSetupError);
+      setErrors({ submit: userSetupError });
+      return;
+    }
+
+    if (!userId) {
+      console.error('No user ID available');
+      setErrors({ submit: 'Please wait while we set up your account...' });
+      return;
+    }
+
     setIsSubmitting(true);
     
     // Validate document uploads
@@ -152,11 +202,22 @@ export default function ApplicationForm() {
     }
 
     try {
-      await createApplication({
+      console.log('Starting application submission process');
+      console.log('User ID:', userId);
+      console.log('Form data:', {
+        ...formData,
+        documents: Object.keys(formData.documents).reduce((acc, key) => ({
+          ...acc,
+          [key]: formData.documents[key] ? 'File present' : 'No file'
+        }), {})
+      });
+
+      const application = await createApplication({
         ...formData,
         userId
       });
       
+      console.log('Application created successfully:', application);
       setShowSuccess(true);
       setTimeout(() => {
         setIsFading(true);
@@ -310,229 +371,251 @@ export default function ApplicationForm() {
           </p>
         </div>
 
-        {/* Progress Bar */}
-        {renderProgressBar()}
-
-        {/* Form Container */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {errors.submit && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mx-6 mt-6">
-              {errors.submit}
+        {hasApplication ? (
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden p-8 text-center">
+            <div className="mb-6">
+              <svg className="mx-auto h-16 w-16 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
             </div>
-          )}
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Application Already Submitted</h2>
+            <p className="text-gray-600 mb-6">
+              You have already submitted an application. Please check your application status or contact us if you need to make any changes.
+            </p>
+            <button
+              onClick={() => router.push('/application-status')}
+              className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
+            >
+              View Application Status
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Progress Bar */}
+            {renderProgressBar()}
 
-          <form onSubmit={handleSubmit}>
-            {/* Step 1: Motivation & Background */}
-            {currentStep === 1 && (
-              <div className="p-6 sm:p-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                  <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">1</span>
-                  Motivation & Teaching Background
-                </h2>
-                
-                {renderTextArea(
-                  "motivation", 
-                  "What motivates you to become a driving instructor, and what excites you about teaching new drivers?",
-                  "Share your passion for teaching and driver education..."
-                )}
-                
-                {renderTextArea(
-                  "trainingBackground", 
-                  "Have you ever trained or mentored others? If so, how did you support their learning and growth?",
-                  "Describe your previous experience in teaching or mentoring roles..."
-                )}
-                
-                {renderTextArea(
-                  "simplifyingConcepts", 
-                  "How would you explain a complex topic—like the air brake system—to someone with no prior truck experience?",
-                  "Explain your approach to breaking down technical concepts..."
-                )}
-
-                <div className="flex justify-end mt-8">
-                  <button
-                    type="button"
-                    onClick={handleNextClick}
-                    className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md flex items-center"
-                  >
-                    Continue
-                    <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
+            {/* Form Container */}
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mx-6 mt-6">
+                  {errors.submit}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Step 2: Teaching Approach */}
-            {currentStep === 2 && (
-              <div className="p-6 sm:p-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                  <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">2</span>
-                  Teaching Approach
-                </h2>
-                
-                {renderTextArea(
-                  "handlingChallenges", 
-                  "What's your approach when a student is struggling with maneuvers like alley docking or parallel parking?",
-                  "Describe your strategies for helping students overcome difficult maneuvers..."
-                )}
-                
-                {renderTextArea(
-                  "managingAnxiety", 
-                  "How do you help students who become frustrated or anxious during on-the-road training?",
-                  "Share your techniques for managing student stress and anxiety..."
-                )}
-                
-                {renderTextArea(
-                  "regulatoryKnowledge", 
-                  "How familiar are you with DOT regulations, and how do you ensure your students understand and follow them?",
-                  "Explain your knowledge of transportation regulations and how you'd teach them..."
-                )}
-
-                <div className="flex justify-between mt-8">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center"
-                  >
-                    <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextClick}
-                    className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md flex items-center"
-                  >
-                    Continue
-                    <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Professional Skills */}
-            {currentStep === 3 && (
-              <div className="p-6 sm:p-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                  <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">3</span>
-                  Professional Skills
-                </h2>
-                
-                {renderTextArea(
-                  "physicalReadiness", 
-                  "Are you comfortable working outdoors in all weather conditions and climbing in and out of trucks throughout the day?",
-                  "Describe your physical readiness for the demands of this role..."
-                )}
-                
-                {renderTextArea(
-                  "examWillingness", 
-                  "Are you willing to take and pass the MVC Instructor Exam if you haven't already?",
-                  "Share your thoughts on certification requirements..."
-                )}
-                
-                {renderTextArea(
-                  "monitoringProgress", 
-                  "How do you track student progress and provide constructive feedback?",
-                  "Explain your approach to assessment and feedback..."
-                )}
-
-                <div className="flex justify-between mt-8">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center"
-                  >
-                    <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextClick}
-                    className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md flex items-center"
-                  >
-                    Continue
-                    <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Document Upload Section */}
-            {currentStep === 4 && (
-              <div className="p-6 sm:p-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                  <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">4</span>
-                  Required Documents
-                </h2>
-                
-                <p className="text-gray-600 mb-6">
-                  Please upload the following documents to complete your application. All documents must be in PDF, DOC, DOCX, JPG, or PNG format.
-                </p>
-                
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    {renderFileInput("driversLicense", "Driver's License or CDL", true)}
-                  </div>
-                  <div>
-                    {renderFileInput("medicalCard", "Medical Card", true)}
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    {renderFileInput("driverAbstract", "Driver's Abstract", true)}
-                  </div>
-                  <div>
-                    {renderFileInput("instructorCertifications", "Instructor Certifications (Optional)")}
-                  </div>
-                </div>
-
-                <div className="flex justify-between mt-8">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center"
-                  >
-                    <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        Submit Application
-                        <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </>
+              <form onSubmit={handleSubmit}>
+                {/* Step 1: Motivation & Background */}
+                {currentStep === 1 && (
+                  <div className="p-6 sm:p-8">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                      <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">1</span>
+                      Motivation & Teaching Background
+                    </h2>
+                    
+                    {renderTextArea(
+                      "motivation", 
+                      "What motivates you to become a driving instructor, and what excites you about teaching new drivers?",
+                      "Share your passion for teaching and driver education..."
                     )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </form>
-        </div>
+                    
+                    {renderTextArea(
+                      "trainingBackground", 
+                      "Have you ever trained or mentored others? If so, how did you support their learning and growth?",
+                      "Describe your previous experience in teaching or mentoring roles..."
+                    )}
+                    
+                    {renderTextArea(
+                      "simplifyingConcepts", 
+                      "How would you explain a complex topic—like the air brake system—to someone with no prior truck experience?",
+                      "Explain your approach to breaking down technical concepts..."
+                    )}
+
+                    <div className="flex justify-end mt-8">
+                      <button
+                        type="button"
+                        onClick={handleNextClick}
+                        className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md flex items-center"
+                      >
+                        Continue
+                        <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Teaching Approach */}
+                {currentStep === 2 && (
+                  <div className="p-6 sm:p-8">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                      <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">2</span>
+                      Teaching Approach
+                    </h2>
+                    
+                    {renderTextArea(
+                      "handlingChallenges", 
+                      "What's your approach when a student is struggling with maneuvers like alley docking or parallel parking?",
+                      "Describe your strategies for helping students overcome difficult maneuvers..."
+                    )}
+                    
+                    {renderTextArea(
+                      "managingAnxiety", 
+                      "How do you help students who become frustrated or anxious during on-the-road training?",
+                      "Share your techniques for managing student stress and anxiety..."
+                    )}
+                    
+                    {renderTextArea(
+                      "regulatoryKnowledge", 
+                      "How familiar are you with DOT regulations, and how do you ensure your students understand and follow them?",
+                      "Explain your knowledge of transportation regulations and how you'd teach them..."
+                    )}
+
+                    <div className="flex justify-between mt-8">
+                      <button
+                        type="button"
+                        onClick={prevStep}
+                        className="px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center"
+                      >
+                        <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNextClick}
+                        className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md flex items-center"
+                      >
+                        Continue
+                        <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Professional Skills */}
+                {currentStep === 3 && (
+                  <div className="p-6 sm:p-8">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                      <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">3</span>
+                      Professional Skills
+                    </h2>
+                    
+                    {renderTextArea(
+                      "physicalReadiness", 
+                      "Are you comfortable working outdoors in all weather conditions and climbing in and out of trucks throughout the day?",
+                      "Describe your physical readiness for the demands of this role..."
+                    )}
+                    
+                    {renderTextArea(
+                      "examWillingness", 
+                      "Are you willing to take and pass the MVC Instructor Exam if you haven't already?",
+                      "Share your thoughts on certification requirements..."
+                    )}
+                    
+                    {renderTextArea(
+                      "monitoringProgress", 
+                      "How do you track student progress and provide constructive feedback?",
+                      "Explain your approach to assessment and feedback..."
+                    )}
+
+                    <div className="flex justify-between mt-8">
+                      <button
+                        type="button"
+                        onClick={prevStep}
+                        className="px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center"
+                      >
+                        <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNextClick}
+                        className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md flex items-center"
+                      >
+                        Continue
+                        <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Document Upload Section */}
+                {currentStep === 4 && (
+                  <div className="p-6 sm:p-8">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                      <span className="flex items-center justify-center bg-blue-600 text-white rounded-full h-8 w-8 mr-3 text-sm">4</span>
+                      Required Documents
+                    </h2>
+                    
+                    <p className="text-gray-600 mb-6">
+                      Please upload the following documents to complete your application. All documents must be in PDF, DOC, DOCX, JPG, or PNG format.
+                    </p>
+                    
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        {renderFileInput("driversLicense", "Driver's License or CDL", true)}
+                      </div>
+                      <div>
+                        {renderFileInput("medicalCard", "Medical Card", true)}
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        {renderFileInput("driverAbstract", "Driver's Abstract", true)}
+                      </div>
+                      <div>
+                        {renderFileInput("instructorCertifications", "Instructor Certifications (Optional)")}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between mt-8">
+                      <button
+                        type="button"
+                        onClick={prevStep}
+                        className="px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center"
+                      >
+                        <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            Submit Application
+                            <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+          </>
+        )}
 
         {/* Footer Info */}
         <div className="mt-8 text-center text-gray-500 text-sm">

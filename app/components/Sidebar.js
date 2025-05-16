@@ -8,7 +8,7 @@ import Link from 'next/link';
 const ADMIN_EMAILS = ['mujtabachandio384@gmail.com', 'adeelahmed12335@gmail.com'];
 
 export default function Sidebar() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -183,14 +183,6 @@ export default function Sidebar() {
           </div>
         </div>
       </aside>
-
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm z-30"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
     </>
   );
 }

@@ -12,6 +12,7 @@ export default function AdminPanel() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState({});
   const { user } = useAuth();
   const router = useRouter();
 
@@ -30,9 +31,11 @@ export default function AdminPanel() {
 
       try {
         const applicationsData = await getAllApplications();
+        console.log('Fetched applications:', applicationsData); // Debug log
         setApplications(applicationsData);
       } catch (error) {
         console.error('Error fetching applications:', error);
+        setError('Failed to fetch applications');
       } finally {
         setLoading(false);
       }
@@ -43,12 +46,16 @@ export default function AdminPanel() {
 
   const handleStatusUpdate = async (applicationId, newStatus) => {
     try {
+      setUpdatingStatus(prev => ({ ...prev, [applicationId]: true }));
       await updateApplicationStatus(applicationId, newStatus);
       // Refresh applications after update
       const updatedApplications = await getAllApplications();
       setApplications(updatedApplications);
     } catch (err) {
       console.error('Failed to update status:', err);
+      setError('Failed to update application status');
+    } finally {
+      setUpdatingStatus(prev => ({ ...prev, [applicationId]: false }));
     }
   };
 
@@ -88,9 +95,14 @@ export default function AdminPanel() {
               {/* Application Card Header */}
               <div className="p-6 border-b border-gray-100">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {application.user?.name || 'Anonymous'}
-                  </h3>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {application.applicant?.email || 'Anonymous'}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {application.applicant?.name || 'No name provided'}
+                    </p>
+                  </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                     application.status === 'approved' ? 'bg-green-100 text-green-800' :
                     application.status === 'rejected' ? 'bg-red-100 text-red-800' :
@@ -116,13 +128,22 @@ export default function AdminPanel() {
                   <select
                     value={application.status}
                     onChange={(e) => handleStatusUpdate(application._id, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={updatingStatus[application._id]}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      updatingStatus[application._id] ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="submitted">Submitted</option>
                     <option value="reviewing">Under Review</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
                   </select>
+                  {updatingStatus[application._id] && (
+                    <div className="text-sm text-blue-600 flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      Updating status...
+                    </div>
+                  )}
                 </div>
 
                 {/* View Details Button */}

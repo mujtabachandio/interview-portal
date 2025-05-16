@@ -3,13 +3,34 @@ import { client, uploadFile } from './sanity';
 export async function createUser(userData) {
   const { email, name, firebaseUid } = userData;
   
-  return client.create({
-    _type: 'user',
-    email,
-    name,
-    firebaseUid,
-    role: 'applicant'
-  });
+  try {
+    // First check if user already exists
+    const existingUser = await client.fetch(
+      `*[_type == "user" && (email == $email || firebaseUid == $firebaseUid)][0]`,
+      { email, firebaseUid }
+    );
+
+    if (existingUser) {
+      console.log('User already exists:', existingUser);
+      return existingUser;
+    }
+
+    // Create new user
+    const newUser = await client.create({
+      _type: 'user',
+      email,
+      name,
+      firebaseUid,
+      role: 'applicant',
+      createdAt: new Date().toISOString()
+    });
+
+    console.log('Created new user:', newUser);
+    return newUser;
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw new Error('Failed to create user account. Please try again.');
+  }
 }
 
 export async function getUserByFirebaseUid(firebaseUid) {
@@ -23,6 +44,16 @@ export async function createApplication(applicationData) {
   const { documents, userId, ...rest } = applicationData;
   
   try {
+    // Verify user exists before creating application
+    const user = await client.fetch(
+      `*[_type == "user" && _id == $userId][0]`,
+      { userId }
+    );
+
+    if (!user) {
+      throw new Error('User not found. Please try submitting your application again.');
+    }
+
     // Upload files to Sanity with retries
     const uploadedDocuments = {};
     for (const [key, file] of Object.entries(documents)) {
@@ -56,6 +87,7 @@ export async function createApplication(applicationData) {
       submittedAt: new Date().toISOString()
     });
 
+    console.log('Created application:', application);
     return application;
   } catch (error) {
     console.error('Error creating application:', error);
@@ -163,4 +195,12 @@ export async function updateApplicationStatus(applicationId, status, reviewerNot
       reviewedAt: new Date().toISOString()
     })
     .commit();
+}
+
+export async function hasExistingApplication(userId) {
+  const application = await client.fetch(
+    `*[_type == "application" && applicant._ref == $userId][0]`,
+    { userId }
+  );
+  return !!application;
 } 

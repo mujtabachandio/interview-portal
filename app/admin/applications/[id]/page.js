@@ -92,9 +92,13 @@ export default function ApplicationDetails({ params }) {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Application Details</h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Submitted by {application.user?.name || 'Anonymous'} on {new Date(application.submittedAt).toLocaleDateString()}
-                </p>
+                <div className="text-sm text-gray-500 mt-1">
+                  <p>Submitted by {application.applicant?.email || 'Anonymous'}</p>
+                  {application.applicant?.name && (
+                    <p className="text-gray-400">{application.applicant.name}</p>
+                  )}
+                  <p className="text-gray-400">on {new Date(application.submittedAt).toLocaleDateString()}</p>
+                </div>
               </div>
               <span className={`px-4 py-2 rounded-full text-sm font-medium ${
                 application.status === 'approved' ? 'bg-green-100 text-green-800' :
