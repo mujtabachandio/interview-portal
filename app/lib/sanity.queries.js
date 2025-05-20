@@ -200,42 +200,64 @@ export async function getApplicationById(applicationId) {
 export async function updateApplicationStatus(applicationId, status, reviewerNotes = '') {
   const timestamp = new Date().toISOString();
   
-  // First, get the current application to check if statusHistory exists
-  const currentApplication = await client.fetch(
-    `*[_type == "application" && _id == $applicationId][0]`,
-    { applicationId }
-  );
+  try {
+    // First, get the current application to check if statusHistory exists
+    const currentApplication = await client.fetch(
+      `*[_type == "application" && _id == $applicationId][0]`,
+      { applicationId }
+    );
 
-  const statusHistoryEntry = {
-    _type: 'object',
-    status,
-    notes: reviewerNotes,
-    timestamp
-  };
+    if (!currentApplication) {
+      throw new Error('Application not found');
+    }
 
-  // If statusHistory doesn't exist, create it with the new entry
-  if (!currentApplication.statusHistory) {
-    return client
+    console.log('Updating application status:', {
+      applicationId,
+      currentStatus: currentApplication.status,
+      newStatus: status,
+      reviewerNotes
+    });
+
+    const statusHistoryEntry = {
+      _type: 'object',
+      status,
+      notes: reviewerNotes,
+      timestamp
+    };
+
+    // If statusHistory doesn't exist, create it with the new entry
+    if (!currentApplication.statusHistory) {
+      const result = await client
+        .patch(applicationId)
+        .set({
+          status,
+          reviewerNotes,
+          reviewedAt: timestamp,
+          statusHistory: [statusHistoryEntry]
+        })
+        .commit();
+
+      console.log('Status updated (new history):', result);
+      return result;
+    }
+
+    // Otherwise, append to existing statusHistory
+    const result = await client
       .patch(applicationId)
       .set({
         status,
         reviewerNotes,
-        reviewedAt: timestamp,
-        statusHistory: [statusHistoryEntry]
+        reviewedAt: timestamp
       })
+      .insert('after', 'statusHistory[-1]', [statusHistoryEntry])
       .commit();
-  }
 
-  // Otherwise, append to existing statusHistory
-  return client
-    .patch(applicationId)
-    .set({
-      status,
-      reviewerNotes,
-      reviewedAt: timestamp
-    })
-    .insert('after', 'statusHistory[-1]', [statusHistoryEntry])
-    .commit();
+    console.log('Status updated (existing history):', result);
+    return result;
+  } catch (error) {
+    console.error('Error updating application status:', error);
+    throw new Error('Failed to update application status. Please try again.');
+  }
 }
 
 export async function hasExistingApplication(userId) {
