@@ -54,25 +54,36 @@ export async function createApplication(applicationData) {
       throw new Error('User not found. Please try submitting your application again.');
     }
 
-    // Upload files to Sanity with retries
-    const uploadedDocuments = {};
-    for (const [key, file] of Object.entries(documents)) {
-      if (file) {
+    // Upload all files in parallel
+    const uploadPromises = Object.entries(documents)
+      .filter(([_, file]) => file) // Only process files that exist
+      .map(async ([key, file]) => {
         try {
           const asset = await uploadFile(file);
-          uploadedDocuments[key] = {
-            _type: 'file',
+          return {
+            key,
             asset: {
-              _type: 'reference',
-              _ref: asset._id
+              _type: 'file',
+              asset: {
+                _type: 'reference',
+                _ref: asset._id
+              }
             }
           };
         } catch (error) {
           console.error(`Failed to upload ${key}:`, error);
           throw new Error(`Failed to upload ${key}. Please try again.`);
         }
-      }
-    }
+      });
+
+    // Wait for all uploads to complete
+    const uploadResults = await Promise.all(uploadPromises);
+    
+    // Convert results to the required format
+    const uploadedDocuments = uploadResults.reduce((acc, { key, asset }) => ({
+      ...acc,
+      [key]: asset
+    }), {});
 
     const timestamp = new Date().toISOString();
 
@@ -95,7 +106,6 @@ export async function createApplication(applicationData) {
       }]
     });
 
-    console.log('Created application:', application);
     return application;
   } catch (error) {
     console.error('Error creating application:', error);

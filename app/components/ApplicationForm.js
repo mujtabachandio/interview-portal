@@ -31,6 +31,7 @@ export default function ApplicationForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [userSetupError, setUserSetupError] = useState(null);
   const [hasApplication, setHasApplication] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
   const router = useRouter();
 
   useEffect(() => {
@@ -185,6 +186,7 @@ export default function ApplicationForm() {
     }
 
     setIsSubmitting(true);
+    setUploadProgress({});
     
     // Validate document uploads
     const newErrors = {};
@@ -202,14 +204,14 @@ export default function ApplicationForm() {
     }
 
     try {
-      console.log('Starting application submission process');
-      console.log('User ID:', userId);
-      console.log('Form data:', {
-        ...formData,
-        documents: Object.keys(formData.documents).reduce((acc, key) => ({
-          ...acc,
-          [key]: formData.documents[key] ? 'File present' : 'No file'
-        }), {})
+      // Initialize progress for each file
+      Object.keys(formData.documents).forEach(key => {
+        if (formData.documents[key]) {
+          setUploadProgress(prev => ({
+            ...prev,
+            [key]: 0
+          }));
+        }
       });
 
       const application = await createApplication({
@@ -217,7 +219,6 @@ export default function ApplicationForm() {
         userId
       });
       
-      console.log('Application created successfully:', application);
       setShowSuccess(true);
       setTimeout(() => {
         setIsFading(true);
@@ -227,9 +228,10 @@ export default function ApplicationForm() {
       }, 2000);
     } catch (err) {
       console.error('Error submitting application:', err);
-      setErrors({ submit: 'Failed to submit application. Please try again.' });
+      setErrors({ submit: err.message || 'Failed to submit application. Please try again.' });
     } finally {
       setIsSubmitting(false);
+      setUploadProgress({});
     }
   };
 
@@ -295,8 +297,11 @@ export default function ApplicationForm() {
     );
   };
 
-  // Function to render file input with consistent styling
+  // Function to render file input with progress indicator
   const renderFileInput = (name, label, required = false) => {
+    const progress = uploadProgress[name];
+    const showProgress = progress !== undefined && progress < 100;
+
     return (
       <div className="mb-6">
         <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-2">
@@ -326,6 +331,17 @@ export default function ApplicationForm() {
               PDF, DOC, DOCX, JPG or PNG up to 10MB
             </span>
           </label>
+          {showProgress && (
+            <div className="mt-2">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+              <span className="text-xs text-gray-500 mt-1">{progress}% uploaded</span>
+            </div>
+          )}
         </div>
         {errors[name] && (
           <p className="mt-1 text-sm text-red-600">{errors[name]}</p>

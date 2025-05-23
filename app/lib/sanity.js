@@ -45,8 +45,15 @@ export const previewClient = createClient({
 // Helper function to get the appropriate client
 export const getClient = (preview = false) => (preview ? previewClient : client)
 
-// Helper function to handle file uploads with retries
-export const uploadFile = async (file, retries = 3) => {
+// Helper function to handle file uploads with optimized retries
+export const uploadFile = async (file, retries = 2) => {
+  // Validate file size before upload (10MB limit)
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`File size exceeds 10MB limit. Please compress or resize the file.`);
+  }
+
+  let lastError;
   for (let i = 0; i < retries; i++) {
     try {
       const asset = await client.assets.upload('file', file, {
@@ -55,12 +62,14 @@ export const uploadFile = async (file, retries = 3) => {
       });
       return asset;
     } catch (error) {
+      lastError = error;
       console.error(`File upload attempt ${i + 1} failed:`, error);
-      if (i === retries - 1) throw error;
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      if (i === retries - 1) break;
+      // Exponential backoff: 500ms, 1000ms
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, i)));
     }
   }
+  throw lastError;
 };
 
 const builder = imageUrlBuilder(client);
